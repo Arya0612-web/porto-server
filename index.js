@@ -1016,10 +1016,19 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
+app.listen(PORT, "0.0.0.0", () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📁 Uploads directory: ${uploadsDir}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
+  console.log(`🌐 Health check ready at /api/health`);
   console.log(`📧 Contact endpoint: http://localhost:${PORT}/api/contact`);
   console.log(`📨 Messages endpoint: http://localhost:${PORT}/api/messages`);
 });
+
+process.on("uncaughtException", (err) => {
+  console.error("Uncaught Exception:", err);
+});
+
+process.on("unhandledRejection", (reason) => {
+  console.error("Unhandled Rejection:", reason);
+});
+
