@@ -1,33 +1,19 @@
-import multer from "multer";
-import { CloudinaryStorage } from "multer-storage-cloudinary";
-import { v2 as cloudinary } from "cloudinary";
-
-// server.js
+// Load env dulu
 require("dotenv").config();
 
-const express = require("express");
-const mysql = require("mysql2/promise");
-const cors = require("cors");
-const bcrypt = require("bcrypt");
-const jwt = require("jsonwebtoken");
-const fileUpload = require("express-fileupload");
-const path = require("path");
-const fs = require("fs");
-
+// CLOUDINARY + MULTER SETUP
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
 
-
-// CONFIG CLOUDINARY HARUS SETELAH REQUIRE
+// Config Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
   api_secret: process.env.CLOUDINARY_API_SECRET,
 });
 
-
-// STORAGE CLOUDINARY
+// Storage Cloudinary
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
@@ -36,28 +22,16 @@ const storage = new CloudinaryStorage({
   },
 });
 
-const upload = multer({ storage });
-
-cloudinary.config({
-  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
-  api_key: process.env.CLOUDINARY_API_KEY,
-  api_secret: process.env.CLOUDINARY_API_SECRET,
-});
-
-
-const cloudinary = require("cloudinary").v2;
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-
-const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
-  params: {
-    folder: "portfolio_projects", // nama folder di cloudinary
-    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+// Multer Upload Middleware
+const upload = multer({
+  storage,
+  limits: {
+    fileSize: 2 * 1024 * 1024, // max 2MB
   },
 });
 
-const upload = multer({ storage });
+
+
 
 
 const app = express();
