@@ -1,6 +1,13 @@
 // Load env dulu
 require("dotenv").config();
 
+// IMPORT MODULE WAJIB
+const express = require("express");
+const cors = require("cors");
+const fileUpload = require("express-fileupload");
+const path = require("path");
+const fs = require("fs");
+
 // CLOUDINARY + MULTER SETUP
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
