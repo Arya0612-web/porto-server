@@ -9,6 +9,28 @@ const path = require('path');
 const fs = require('fs');
 require('dotenv').config();
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "portfolio_projects", // nama folder di cloudinary
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+  },
+});
+
+const upload = multer({ storage });
+
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -42,16 +64,14 @@ app.use('/uploads', express.static(uploadsDir, {
 
 // Database connection
 const dbConfig = {
-  host: process.env.MYSQLHOST,
-  user: process.env.MYSQLUSER,
-  password: process.env.MYSQLPASSWORD,
-  database: process.env.MYSQLDATABASE,
-  port: process.env.MYSQLPORT,
+  host: process.env.DB_HOST || 'localhost',
+  user: process.env.DB_USER || 'root',
+  password: process.env.DB_PASSWORD || '',
+  database: process.env.DB_NAME || 'portfolio_db',
   waitForConnections: true,
   connectionLimit: 10,
   queueLimit: 0
 };
-
 
 const pool = mysql.createPool(dbConfig);
 
@@ -716,165 +736,127 @@ app.post('/api/upload', authenticateToken, async (req, res) => {
 });
 
 // Create new project (Admin only)
-app.post('/api/projects', authenticateToken, async (req, res) => {
-  try {
-    const { 
-      title, 
-      description, 
-      technologies, 
-      image_url, 
-      project_url, 
-      github_url, 
-      category,
-      featured = false
-    } = req.body;
-    
-    // Validation
-    if (!title || !description || !technologies) {
-      return res.status(400).json({ error: 'Title, description, and technologies are required' });
+app.post(
+  "/api/projects",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const {
+        title,
+        description,
+        technologies,
+        project_url,
+        github_url,
+        category,
+        featured = false,
+      } = req.body;
+
+      if (!title || !description || !technologies) {
+        return res.status(400).json({
+          error: "Title, description, and technologies are required",
+        });
+      }
+
+      // ✅ Ambil URL dari Cloudinary
+      const image_url = req.file ? req.file.path : null;
+
+      const [result] = await pool.execute(
+        `INSERT INTO projects 
+        (title, description, technologies, image_url, project_url, github_url, category, featured)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+        [
+          title.trim(),
+          description.trim(),
+          technologies.trim(),
+          image_url,
+          project_url || null,
+          github_url || null,
+          category || null,
+          featured,
+        ]
+      );
+
+      const [rows] = await pool.execute(
+        "SELECT * FROM projects WHERE id = ?",
+        [result.insertId]
+      );
+
+      res.status(201).json({
+        message: "Project created successfully",
+        project: rows[0],
+      });
+    } catch (error) {
+      console.error("Error creating project:", error);
+      res.status(500).json({ error: "Failed to create project" });
     }
-    
-    const [result] = await pool.execute(
-      `INSERT INTO projects 
-       (title, description, technologies, image_url, project_url, github_url, category, featured) 
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        title.trim(), 
-        description.trim(), 
-        technologies.trim(), 
-        image_url || null, 
-        project_url || null, 
-        github_url || null, 
-        category || null, 
-        featured
-      ]
-    );
-    
-    // Get created project
-    const [rows] = await pool.execute(
-      'SELECT * FROM projects WHERE id = ?',
-      [result.insertId]
-    );
-    
-    res.status(201).json({ 
-      message: 'Project created successfully', 
-      project: rows[0]
-    });
-  } catch (error) {
-    console.error('Error creating project:', error);
-    res.status(500).json({ error: 'Failed to create project' });
   }
-});
+);
+
 
 // Update project (Admin only)
-app.put('/api/projects/:id', authenticateToken, async (req, res) => {
+app.put(
+  "/api/projects/:id",
+  authenticateToken,
+  upload.single("image"),
+  async (req, res) => {
+    try {
+      const { id } = req.params;
+
+      const {
+        title,
+        description,
+        technologies,
+        project_url,
+        github_url,
+        category,
+        featured = false,
+      } = req.body;
+
+      const image_url = req.file ? req.file.path : req.body.image_url;
+
+      await pool.execute(
+        `UPDATE projects SET 
+        title=?, description=?, technologies=?, image_url=?,
+        project_url=?, github_url=?, category=?, featured=?
+        WHERE id=?`,
+        [
+          title,
+          description,
+          technologies,
+          image_url,
+          project_url,
+          github_url,
+          category,
+          featured,
+          id,
+        ]
+      );
+
+      res.json({ message: "Project updated successfully" });
+    } catch (error) {
+      res.status(500).json({ error: "Update failed" });
+    }
+  }
+);
+
+
+// Delete project (Admin only)
+app.delete("/api/projects/:id", authenticateToken, async (req, res) => {
   try {
     const { id } = req.params;
-    
-    if (!id || isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid project ID' });
-    }
-    
-    const { 
-      title, 
-      description, 
-      technologies, 
-      image_url, 
-      project_url, 
-      github_url, 
-      category,
-      featured = false
-    } = req.body;
-    
-    // Check if project exists
-    const [checkRows] = await pool.execute(
-      'SELECT id FROM projects WHERE id = ?',
-      [id]
-    );
-    
-    if (checkRows.length === 0) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    
-    // Update project
-    const [result] = await pool.execute(
-      `UPDATE projects SET 
-       title = ?, description = ?, technologies = ?, image_url = ?, 
-       project_url = ?, github_url = ?, category = ?, featured = ?, 
-       updated_at = CURRENT_TIMESTAMP 
-       WHERE id = ?`,
-      [
-        title?.trim() || '', 
-        description?.trim() || '', 
-        technologies?.trim() || '', 
-        image_url || null, 
-        project_url || null, 
-        github_url || null, 
-        category || null, 
-        featured, 
-        id
-      ]
-    );
-    
-    // Get updated project
-    const [rows] = await pool.execute(
-      'SELECT * FROM projects WHERE id = ?',
-      [id]
-    );
-    
-    res.json({ 
-      message: 'Project updated successfully', 
-      project: rows[0]
+
+    await pool.execute("DELETE FROM projects WHERE id = ?", [id]);
+
+    res.json({
+      message: "Project deleted successfully",
+      deletedId: id,
     });
   } catch (error) {
-    console.error('Error updating project:', error);
-    res.status(500).json({ error: 'Failed to update project' });
+    res.status(500).json({ error: "Failed to delete project" });
   }
 });
 
-// Delete project (Admin only)
-app.delete('/api/projects/:id', authenticateToken, async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-    if (!id || isNaN(id)) {
-      return res.status(400).json({ error: 'Invalid project ID' });
-    }
-    
-    // Get project info for image cleanup
-    const [projectRows] = await pool.execute(
-      'SELECT image_url FROM projects WHERE id = ?',
-      [id]
-    );
-    
-    if (projectRows.length === 0) {
-      return res.status(404).json({ error: 'Project not found' });
-    }
-    
-    // Delete from database
-    const [result] = await pool.execute(
-      'DELETE FROM projects WHERE id = ?',
-      [id]
-    );
-    
-    // Optionally delete associated image file
-    if (projectRows[0].image_url) {
-      const imagePath = path.join(__dirname, projectRows[0].image_url);
-      if (fs.existsSync(imagePath)) {
-        fs.unlinkSync(imagePath);
-        console.log(`Deleted image file: ${imagePath}`);
-      }
-    }
-    
-    res.json({ 
-      message: 'Project deleted successfully',
-      deletedId: id
-    });
-  } catch (error) {
-    console.error('Error deleting project:', error);
-    res.status(500).json({ error: 'Failed to delete project' });
-  }
-});
 
 // Get featured projects
 app.get('/api/projects/featured', async (req, res) => {
@@ -1016,19 +998,10 @@ app.use('*', (req, res) => {
 });
 
 // Start server
-app.listen(PORT, "0.0.0.0", () => {
+app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
   console.log(`📁 Uploads directory: ${uploadsDir}`);
-  console.log(`🌐 Health check ready at /api/health`);
+  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
   console.log(`📧 Contact endpoint: http://localhost:${PORT}/api/contact`);
   console.log(`📨 Messages endpoint: http://localhost:${PORT}/api/messages`);
 });
-
-process.on("uncaughtException", (err) => {
-  console.error("Uncaught Exception:", err);
-});
-
-process.on("unhandledRejection", (reason) => {
-  console.error("Unhandled Rejection:", reason);
-});
-
