@@ -769,6 +769,9 @@ app.post(
       // ✅ Ambil URL dari Cloudinary
       const image_url = req.file ? req.file.path : null;
 
+      const featuredValue =
+        featured === true || featured === "true" ? 1 : 0;
+
       const [result] = await pool.execute(
         `INSERT INTO projects 
         (title, description, technologies, image_url, project_url, github_url, category, featured)
@@ -781,7 +784,7 @@ app.post(
           project_url || null,
           github_url || null,
           category || null,
-          featured,
+          featuredValue,
         ]
       );
 
@@ -823,6 +826,9 @@ app.put(
 
       const image_url = req.file ? req.file.path : req.body.image_url;
 
+      const featuredValue =
+        featured === true || featured === "true" ? 1 : 0;
+
       await pool.execute(
         `UPDATE projects SET 
         title=?, description=?, technologies=?, image_url=?,
@@ -836,7 +842,7 @@ app.put(
           project_url,
           github_url,
           category,
-          featured,
+          featuredValue,
           id,
         ]
       );
