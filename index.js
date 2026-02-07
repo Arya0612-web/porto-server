@@ -1,14 +1,18 @@
 // Load env dulu
 require("dotenv").config();
 
+// ==============================
 // IMPORT MODULE WAJIB
+// ==============================
 const express = require("express");
 const cors = require("cors");
-const fileUpload = require("express-fileupload");
-const path = require("path");
-const fs = require("fs");
 
+const jwt = require("jsonwebtoken");
+const mysql = require("mysql2/promise");
+
+// ==============================
 // CLOUDINARY + MULTER SETUP
+// ==============================
 const cloudinary = require("cloudinary").v2;
 const multer = require("multer");
 const { CloudinaryStorage } = require("multer-storage-cloudinary");
@@ -22,7 +26,7 @@ cloudinary.config({
 
 // Storage Cloudinary
 const storage = new CloudinaryStorage({
-  cloudinary: cloudinary,
+  cloudinary,
   params: {
     folder: "portfolio_projects",
     allowed_formats: ["jpg", "png", "jpeg", "webp"],
@@ -37,41 +41,27 @@ const upload = multer({
   },
 });
 
-
-
-
-
+// ==============================
+// EXPRESS APP
+// ==============================
 const app = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors({
-  origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
-  credentials: true
-}));
+// Middleware JSON
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
-app.use(fileUpload({
-  createParentPath: true,
-  limits: { fileSize: 5 * 1024 * 1024 },
-  abortOnLimit: true,
-  safeFileNames: true,
-  preserveExtension: true
-}));
+// Middleware CORS
+app.use(
+  cors({
+    origin: process.env.CORS_ORIGIN || "http://localhost:3000",
+    credentials: true,
+  })
+);
 
-// Pastikan folder uploads ada
-const uploadsDir = path.join(__dirname, 'uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
-}
-
-// Serve static files
-app.use('/uploads', express.static(uploadsDir, {
-  setHeaders: (res, filePath) => {
-    res.set('Cache-Control', 'public, max-age=31536000');
-  }
-}));
-
-// Database connection
+// ==============================
+// DATABASE CONNECTION (MYSQL)
+// ==============================
 const dbConfig = {
   host: process.env.MYSQLHOST,
   user: process.env.MYSQLUSER,
@@ -80,43 +70,51 @@ const dbConfig = {
   port: process.env.MYSQLPORT,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0
+  queueLimit: 0,
 };
 
 const pool = mysql.createPool(dbConfig);
 
-// JWT Secret
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-this';
+// ==============================
+// JWT SECRET
+// ==============================
+const JWT_SECRET = process.env.JWT_SECRET || "your-secret-key-change-this";
 
-// Test database connection
+// ==============================
+// TEST DATABASE CONNECTION
+// ==============================
 (async () => {
   try {
     const connection = await pool.getConnection();
-    console.log('Database connected successfully');
+    console.log("✅ Database connected successfully");
     connection.release();
   } catch (error) {
-    console.error('Database connection failed:', error.message);
+    console.error("❌ Database connection failed:", error.message);
   }
 })();
 
-// Authentication middleware
+// ==============================
+// AUTH MIDDLEWARE
+// ==============================
 const authenticateToken = (req, res, next) => {
-  const authHeader = req.headers['authorization'];
-  const token = authHeader && authHeader.split(' ')[1];
-  
+  const authHeader = req.headers["authorization"];
+  const token = authHeader && authHeader.split(" ")[1];
+
   if (!token) {
-    return res.status(401).json({ error: 'Access token required' });
+    return res.status(401).json({ error: "Access token required" });
   }
-  
+
   jwt.verify(token, JWT_SECRET, (err, user) => {
     if (err) {
-      console.error('JWT verification error:', err.message);
-      return res.status(403).json({ error: 'Invalid or expired token' });
+      console.error("JWT verification error:", err.message);
+      return res.status(403).json({ error: "Invalid or expired token" });
     }
+
     req.user = user;
     next();
   });
 };
+
 
 // ========== CONTACT MESSAGES API ==========
 
@@ -992,10 +990,10 @@ app.use(express.urlencoded({ extended: true }));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ 
-    error: 'Internal server error',
-    message: process.env.NODE_ENV === 'development' ? err.message : undefined
+  console.error("Unhandled error:", err);
+  res.status(500).json({
+    error: "Internal server error",
+    message: err.message,
   });
 });
 
@@ -1008,11 +1006,6 @@ app.use('*', (req, res) => {
   });
 });
 
-// Start server
 app.listen(PORT, () => {
   console.log(`🚀 Server running on port ${PORT}`);
-  console.log(`📁 Uploads directory: ${uploadsDir}`);
-  console.log(`🌐 Health check: http://localhost:${PORT}/api/health`);
-  console.log(`📧 Contact endpoint: http://localhost:${PORT}/api/contact`);
-  console.log(`📨 Messages endpoint: http://localhost:${PORT}/api/messages`);
 });
