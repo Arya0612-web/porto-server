@@ -1,3 +1,7 @@
+import multer from "multer";
+import { CloudinaryStorage } from "multer-storage-cloudinary";
+import { v2 as cloudinary } from "cloudinary";
+
 // server.js
 require("dotenv").config();
 
@@ -34,6 +38,28 @@ const storage = new CloudinaryStorage({
 
 const upload = multer({ storage });
 
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+
+
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+const storage = new CloudinaryStorage({
+  cloudinary: cloudinary,
+  params: {
+    folder: "portfolio_projects", // nama folder di cloudinary
+    allowed_formats: ["jpg", "png", "jpeg", "webp"],
+  },
+});
+
+const upload = multer({ storage });
+
+
 const app = express();
 const PORT = process.env.PORT || 5000;
 
@@ -42,8 +68,7 @@ app.use(cors({
   origin: process.env.CORS_ORIGIN || 'http://localhost:3000',
   credentials: true
 }));
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
 app.use(fileUpload({
   createParentPath: true,
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -981,7 +1006,8 @@ app.get("/api/dashboard/stats", authenticateToken, async (req, res) => {
   }
 });
 
-
+app.use(express.json());
+app.use(express.urlencoded({ extended: true }));
 
 // Error handling middleware
 app.use((err, req, res, next) => {
