@@ -1,14 +1,21 @@
 // server.js
-const express = require('express');
-const mysql = require('mysql2/promise');
-const cors = require('cors');
-const bcrypt = require('bcrypt');
-const jwt = require('jsonwebtoken');
-const fileUpload = require('express-fileupload');
-const path = require('path');
-const fs = require('fs');
-require('dotenv').config();
+require("dotenv").config();
 
+const express = require("express");
+const mysql = require("mysql2/promise");
+const cors = require("cors");
+const bcrypt = require("bcrypt");
+const jwt = require("jsonwebtoken");
+const fileUpload = require("express-fileupload");
+const path = require("path");
+const fs = require("fs");
+
+const cloudinary = require("cloudinary").v2;
+const multer = require("multer");
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
+
+
+// CONFIG CLOUDINARY HARUS SETELAH REQUIRE
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -16,20 +23,16 @@ cloudinary.config({
 });
 
 
-const cloudinary = require("cloudinary").v2;
-const multer = require("multer");
-const { CloudinaryStorage } = require("multer-storage-cloudinary");
-
+// STORAGE CLOUDINARY
 const storage = new CloudinaryStorage({
   cloudinary: cloudinary,
   params: {
-    folder: "portfolio_projects", // nama folder di cloudinary
+    folder: "portfolio_projects",
     allowed_formats: ["jpg", "png", "jpeg", "webp"],
   },
 });
 
 const upload = multer({ storage });
-
 
 const app = express();
 const PORT = process.env.PORT || 5000;
