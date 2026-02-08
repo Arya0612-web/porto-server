@@ -9,6 +9,8 @@ const cors = require("cors");
 
 const jwt = require("jsonwebtoken");
 const mysql = require("mysql2/promise");
+const bcrypt = require("bcrypt");
+
 
 // ==============================
 // CLOUDINARY + MULTER SETUP
